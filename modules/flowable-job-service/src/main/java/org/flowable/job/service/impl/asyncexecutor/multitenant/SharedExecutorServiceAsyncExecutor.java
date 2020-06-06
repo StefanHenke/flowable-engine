@@ -1,14 +1,8 @@
-/* Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/*
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except in compliance with the License. You may
+ * obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0 Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
+ * or implied. See the License for the specific language governing permissions and limitations under the License.
  */
 package org.flowable.job.service.impl.asyncexecutor.multitenant;
 
@@ -18,19 +12,15 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 
 import org.flowable.common.engine.impl.cfg.multitenant.TenantInfoHolder;
-import org.flowable.job.api.JobInfo;
-import org.flowable.job.service.JobServiceConfiguration;
 import org.flowable.job.service.impl.asyncexecutor.AsyncExecutor;
 import org.flowable.job.service.impl.asyncexecutor.DefaultAsyncJobExecutor;
-import org.flowable.job.service.impl.asyncexecutor.ExecuteAsyncRunnableFactory;
 import org.flowable.job.service.impl.cmd.UnacquireOwnedJobsCmd;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Multi tenant {@link AsyncExecutor}.
- * 
- * For each tenant, there will be acquire threads, but only one {@link ExecutorService} will be used once the jobs are acquired.
+ * Multi tenant {@link AsyncExecutor}. For each tenant, there will be acquire threads, but only one {@link ExecutorService} will be used
+ * once the jobs are acquired.
  * 
  * @author Joram Barrez
  */
@@ -53,20 +43,9 @@ public class SharedExecutorServiceAsyncExecutor extends DefaultAsyncJobExecutor 
         this.tenantInfoHolder = tenantInfoHolder;
         this.unlockOwnedJobs = false;
 
-        setExecuteAsyncRunnableFactory(new ExecuteAsyncRunnableFactory() {
-
-            @Override
-            public Runnable createExecuteAsyncRunnable(JobInfo job, JobServiceConfiguration jobServiceConfiguration) {
-
-                // Here, the runnable will be created by for example the acquire thread, which has already set the current id.
-                // But it will be executed later on, by the executorService and thus we need to set it explicitly again then
-
-                return new TenantAwareExecuteAsyncRunnable(job, jobServiceConfiguration,
-                        SharedExecutorServiceAsyncExecutor.this.tenantInfoHolder,
-                        SharedExecutorServiceAsyncExecutor.this.tenantInfoHolder.getCurrentTenantId());
-            }
-
-        });
+        setExecuteAsyncRunnableFactory((job, jobServiceConfiguration) -> new TenantAwareExecuteAsyncRunnable(job, jobServiceConfiguration,
+                SharedExecutorServiceAsyncExecutor.this.tenantInfoHolder,
+                SharedExecutorServiceAsyncExecutor.this.tenantInfoHolder.getCurrentTenantId()));
     }
 
     @Override
@@ -81,11 +60,13 @@ public class SharedExecutorServiceAsyncExecutor extends DefaultAsyncJobExecutor 
         timerJobAcquisitionRunnables.put(tenantId, timerRunnable);
         timerJobAcquisitionThreads.put(tenantId, new Thread(timerRunnable));
 
-        TenantAwareAcquireAsyncJobsDueRunnable asyncJobsRunnable = new TenantAwareAcquireAsyncJobsDueRunnable(this, tenantInfoHolder, tenantId);
+        TenantAwareAcquireAsyncJobsDueRunnable asyncJobsRunnable = new TenantAwareAcquireAsyncJobsDueRunnable(this, tenantInfoHolder,
+                tenantId);
         asyncJobAcquisitionRunnables.put(tenantId, asyncJobsRunnable);
         asyncJobAcquisitionThreads.put(tenantId, new Thread(asyncJobsRunnable));
 
-        TenantAwareResetExpiredJobsRunnable resetExpiredJobsRunnable = new TenantAwareResetExpiredJobsRunnable(this, tenantInfoHolder, tenantId);
+        TenantAwareResetExpiredJobsRunnable resetExpiredJobsRunnable = new TenantAwareResetExpiredJobsRunnable(this, tenantInfoHolder,
+                tenantId);
         resetExpiredJobsRunnables.put(tenantId, resetExpiredJobsRunnable);
         resetExpiredJobsThreads.put(tenantId, new Thread(resetExpiredJobsRunnable));
 
@@ -95,7 +76,7 @@ public class SharedExecutorServiceAsyncExecutor extends DefaultAsyncJobExecutor 
             startResetExpiredJobsForTenant(tenantId);
         }
     }
-    
+
     @Override
     public AsyncExecutor getTenantAsyncExecutor(String tenantId) {
         return this;
@@ -122,6 +103,17 @@ public class SharedExecutorServiceAsyncExecutor extends DefaultAsyncJobExecutor 
             startAsyncJobAcquisitionForTenant(tenantId);
             startResetExpiredJobsForTenant(tenantId);
         }
+
+        if (isActive) {
+            return;
+        }
+
+        isActive = true;
+
+        initializeJobEntityManager();
+        initializeRunnables();
+        initAsyncJobExecutionThreadPool();
+        executeTemporaryJobs();
     }
 
     protected void startTimerJobAcquisitionForTenant(String tenantId) {
