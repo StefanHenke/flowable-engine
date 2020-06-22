@@ -16,6 +16,7 @@ import java.util.concurrent.ExecutorService;
 
 import javax.sql.DataSource;
 
+import org.flowable.common.engine.api.FlowableException;
 import org.flowable.common.engine.impl.cfg.multitenant.TenantAwareDataSource;
 import org.flowable.common.engine.impl.cfg.multitenant.TenantInfoHolder;
 import org.flowable.common.engine.impl.interceptor.Command;
@@ -34,7 +35,6 @@ import org.flowable.job.service.impl.asyncexecutor.AsyncExecutor;
 import org.flowable.job.service.impl.asyncexecutor.multitenant.ExecutorPerTenantAsyncExecutor;
 import org.flowable.job.service.impl.asyncexecutor.multitenant.SharedExecutorServiceAsyncExecutor;
 import org.flowable.job.service.impl.asyncexecutor.multitenant.TenantAwareAsyncExecutor;
-
 /**
  * A {@link ProcessEngineConfiguration} that builds a multi tenant {@link ProcessEngine} where each tenant has its own database schema.
  * 
@@ -49,6 +49,8 @@ import org.flowable.job.service.impl.asyncexecutor.multitenant.TenantAwareAsyncE
  * 
  * - Adding tenants (also after boot!) is done using the {@link #registerTenant(String, DataSource)} operations.
  * 
+ * - Defines a "default" schema tenant. This is used during boot phase to create a transaction in tenant independent code. This tenant must be registered before boot
+ * 
  * - Currently, this config does not work with the 'old' {@link JobExecutor}, but only with the newer {@link AsyncExecutor}. There are two different implementations: - The
  * {@link ExecutorPerTenantAsyncExecutor}: creates one full {@link AsyncExecutor} for each tenant. - The {@link SharedExecutorServiceAsyncExecutor}: created acquisition threads for each tenant, but
  * the job execution is done using a process engine shared {@link ExecutorService}. The {@link AsyncExecutor} needs to be injected using the {@link #setAsyncExecutor(AsyncExecutor)} method on this
@@ -61,6 +63,8 @@ import org.flowable.job.service.impl.asyncexecutor.multitenant.TenantAwareAsyncE
 public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEngineConfigurationImpl {
 
     protected TenantInfoHolder tenantInfoHolder;
+    protected String defaultSchemaTenant = "";
+
     protected boolean booted;
 
     public MultiSchemaMultiTenantProcessEngineConfiguration(TenantInfoHolder tenantInfoHolder) {
@@ -96,6 +100,15 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
         }
     }
 
+    public String getDefaultSchemaTenant() {
+        return defaultSchemaTenant;
+    }
+
+
+    public void setDefaultTenant(String defaultSchemaTenant) {
+        this.defaultSchemaTenant = defaultSchemaTenant;
+    }
+
     @Override
     public void initAsyncExecutor() {
 
@@ -124,7 +137,18 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
         boolean originalIsAutoActivateAsyncExecutor = this.asyncExecutorActivate;
         this.asyncExecutorActivate = false;
 
-        ProcessEngine processEngine = super.buildProcessEngine();
+        ProcessEngine processEngine;
+        try {
+            //buildProcessEngine requires a a db transaction why we set the default tenant as data source
+            String defaultSchemaTenant = getDefaultSchemaTenant();
+            if(defaultSchemaTenant==null) {
+                throw new FlowableException("No default schema tenant is set.");
+            }
+            getTenantInfoHolder().setCurrentTenantId(defaultSchemaTenant);
+            processEngine = super.buildProcessEngine();
+        } finally {
+            getTenantInfoHolder().clearCurrentTenantId();
+        }
 
         // Reset to original values
         this.databaseSchemaUpdate = originalDatabaseSchemaUpdate;
@@ -168,6 +192,7 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
     @Override
     public Runnable getProcessEngineCloseRunnable() {
         return new Runnable() {
+
             @Override
             public void run() {
                 for (String tenantId : tenantInfoHolder.getAllTenants()) {
@@ -186,9 +211,11 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
 
     public Command<Void> getProcessEngineCloseCommand() {
         return new Command<Void>() {
+
             @Override
             public Void execute(CommandContext commandContext) {
-                CommandContextUtil.getProcessEngineConfiguration(commandContext).getCommandExecutor().execute(new SchemaOperationProcessEngineClose());
+                CommandContextUtil.getProcessEngineConfiguration(commandContext).getCommandExecutor()
+                        .execute(new SchemaOperationProcessEngineClose());
                 return null;
             }
         };
