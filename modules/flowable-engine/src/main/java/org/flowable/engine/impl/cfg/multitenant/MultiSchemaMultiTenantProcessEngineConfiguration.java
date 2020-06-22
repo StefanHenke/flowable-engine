@@ -192,7 +192,6 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
     @Override
     public Runnable getProcessEngineCloseRunnable() {
         return new Runnable() {
-
             @Override
             public void run() {
                 for (String tenantId : tenantInfoHolder.getAllTenants()) {
@@ -214,8 +213,7 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
 
             @Override
             public Void execute(CommandContext commandContext) {
-                CommandContextUtil.getProcessEngineConfiguration(commandContext).getCommandExecutor()
-                        .execute(new SchemaOperationProcessEngineClose());
+                CommandContextUtil.getProcessEngineConfiguration(commandContext).getCommandExecutor().execute(new SchemaOperationProcessEngineClose());
                 return null;
             }
         };

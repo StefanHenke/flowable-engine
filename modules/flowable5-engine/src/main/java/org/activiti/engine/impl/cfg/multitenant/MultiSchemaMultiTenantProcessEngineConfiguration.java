@@ -14,8 +14,6 @@ import org.activiti.engine.impl.persistence.StrongUuidGenerator;
 
 public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEngineConfigurationImpl {
 
-    protected boolean booted;
-
     public MultiSchemaMultiTenantProcessEngineConfiguration() {
         // Using the UUID generator, as otherwise the ids are pulled from a global pool of ids, backed by
         // a database table. Which is impossible with a multi-database-schema setup.
@@ -31,23 +29,7 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
                     "Setting the databaseType is mandatory when using MultiSchemaMultiTenantProcessEngineConfiguration");
         }
 
-        // Disable schema creation/validation by setting it to null.
-        // We'll do it manually, see buildProcessEngine() method (hence why it's copied first)
-        String originalDatabaseSchemaUpdate = this.databaseSchemaUpdate;
-        this.databaseSchemaUpdate = null;
-
-        // Also, we shouldn't start the async executor until *after* the schema's have been created
-        boolean originalIsAutoActivateAsyncExecutor = this.asyncExecutorActivate;
-        this.asyncExecutorActivate = false;
-
-        ProcessEngine processEngine = super.buildProcessEngine();
-
-        // Reset to original values
-        this.databaseSchemaUpdate = originalDatabaseSchemaUpdate;
-        this.asyncExecutorActivate = originalIsAutoActivateAsyncExecutor;
-
-        booted = true;
-        return processEngine;
+        return super.buildProcessEngine();
     }
 
     @Override
