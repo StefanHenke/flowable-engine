@@ -139,7 +139,7 @@ public class MultiSchemaMultiTenantProcessEngineConfiguration extends ProcessEng
 
         ProcessEngine processEngine;
         try {
-            //buildProcessEngine requires a a db transaction why we set the default tenant as data source
+            //DB transaction is required in the buildProcessEngine method. Therefore, the default tenant is set as a datasource
             String defaultSchemaTenant = getDefaultSchemaTenant();
             if(defaultSchemaTenant==null) {
                 throw new FlowableException("No default schema tenant is set.");
