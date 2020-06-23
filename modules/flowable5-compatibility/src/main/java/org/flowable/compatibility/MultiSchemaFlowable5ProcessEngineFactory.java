@@ -17,11 +17,10 @@ public class MultiSchemaFlowable5ProcessEngineFactory extends DefaultProcessEngi
             super.copyConfigItems(activiti6Configuration, activiti5Configuration);
             activiti5Configuration.setDatabaseType(activiti6Configuration.getDatabaseType());
 
-
             return activiti5Configuration.buildProcessEngine();
-        } else {
-            return super.buildProcessEngine(activiti6Configuration);
         }
+        
+        return super.buildProcessEngine(activiti6Configuration);
     }
 
 }
